@@ -9,6 +9,7 @@ from django.db.models.constants import LOOKUP_SEP
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
 
+ONE_BASED_NUMBER = 1
 
 def get_lookup_value(obj, field):
     try:
@@ -20,7 +21,11 @@ def get_lookup_value(obj, field):
 class OrderedModelQuerySet(models.QuerySet):
     def _get_order_field_name(self):
         return self.model.order_field_name
-
+    
+    def _get_order_starting_number(self):
+        # return self.model.order_starting_number
+        return ONE_BASED_NUMBER
+    
     def _get_order_field_lookup(self, lookup):
         order_field_name = self._get_order_field_name()
         return LOOKUP_SEP.join([order_field_name, lookup])
@@ -39,7 +44,7 @@ class OrderedModelQuerySet(models.QuerySet):
 
     def get_next_order(self):
         order = self.get_max_order()
-        return order + 1 if order is not None else 0
+        return order + 1 if order is not None else self._get_order_starting_number()
 
     def above(self, order, inclusive=False):
         """Filter items above order."""
@@ -118,6 +123,7 @@ class OrderedModelBase(models.Model):
     order_field_name = None
     order_with_respect_to = None
     order_class_path = None
+    order_starting_number = ONE_BASED_NUMBER
 
     class Meta:
         abstract = True
@@ -306,7 +312,7 @@ class OrderedModelBase(models.Model):
         if getattr(self, order_field_name) > getattr(ref, order_field_name):
             o = getattr(ref, order_field_name)
         else:
-            o = self.get_ordering_queryset().below_instance(ref).get_max_order() or 0
+            o = self.get_ordering_queryset().below_instance(ref).get_max_order() or self.order_starting_number
         self.to(o, extra_update=extra_update)
 
     def below(self, ref, extra_update=None):
@@ -318,7 +324,7 @@ class OrderedModelBase(models.Model):
         if getattr(self, order_field_name) == getattr(ref, order_field_name):
             return
         if getattr(self, order_field_name) > getattr(ref, order_field_name):
-            o = self.get_ordering_queryset().above_instance(ref).get_min_order() or 0
+            o = self.get_ordering_queryset().above_instance(ref).get_min_order() or self.order_starting_number
         else:
             o = getattr(ref, order_field_name)
         self.to(o, extra_update=extra_update)
